@@ -50,7 +50,7 @@ REPOSITORY CONTEXT
 Repository: ${meta.fullName}
 Description: ${meta.description ?? '(none provided)'}
 Primary language: ${meta.primaryLanguage ?? 'unknown'}
-Languages by file count: ${languages || 'unknown'}
+Code files by language (file counts, docs and config excluded): ${languages || 'unknown'}
 Stars: ${meta.stars} | Forks: ${meta.forks} | Open issues: ${meta.openIssues}
 License: ${meta.license ?? 'none declared'}
 Default branch: ${meta.defaultBranch}

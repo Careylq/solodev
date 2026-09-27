@@ -15,10 +15,14 @@ const LANGUAGE_BY_EXT: Record<string, string> = {
   yml: 'YAML', yaml: 'YAML', toml: 'TOML', xml: 'XML', astro: 'Astro',
 };
 
+/** Documentation and configuration formats that would otherwise outrank real code by file count. */
+const NON_CODE_LANGUAGES = new Set(['Markdown', 'JSON', 'YAML', 'TOML', 'XML', 'CSV']);
+
 /**
  * Language mix derived from the file tree instead of the GitHub /languages endpoint. That endpoint
  * costs one of the 60 unauthenticated API calls per hour, and the tree already tells us what we
- * need. Values are file counts, not bytes, and the prompt says so.
+ * need. Values are file counts, not bytes, and the prompt says so. Documentation and config
+ * formats are skipped so that a repository with 200 Markdown files still reports as TypeScript.
  */
 export function languagesFromTree(paths: string[]): Record<string, number> {
   const counts: Record<string, number> = {};
@@ -26,9 +30,16 @@ export function languagesFromTree(paths: string[]): Record<string, number> {
     const base = path.split('/').pop() ?? '';
     const ext = base.includes('.') ? base.split('.').pop()!.toLowerCase() : '';
     const language = LANGUAGE_BY_EXT[ext];
-    if (language) counts[language] = (counts[language] ?? 0) + 1;
+    if (!language) continue;
+    counts[language] = (counts[language] ?? 0) + 1;
   }
-  return counts;
+
+  const codeOnly: Record<string, number> = {};
+  for (const [language, count] of Object.entries(counts)) {
+    if (!NON_CODE_LANGUAGES.has(language)) codeOnly[language] = count;
+  }
+  // A repository made entirely of configuration files still deserves an answer.
+  return Object.keys(codeOnly).length > 0 ? codeOnly : counts;
 }
 
 const EXCLUDED_DIRS = new Set([
