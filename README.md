@@ -156,6 +156,25 @@ The honest framing: OnboardPilot does not replace a conversation with the team. 
 reading work *before* that conversation so the conversation starts at a much higher level — which
 is exactly what the "questions only your team can answer" section is for.
 
+## Data sources and compliance
+
+The hackathon requires participants to bring their own data and keep it clean. OnboardPilot's data
+input is the public source code of the repository the user chooses.
+
+- **What is read:** only public GitHub repositories, fetched live at request time.
+- **How:** the GitHub REST API (repository metadata and file tree) and `raw.githubusercontent.com`
+  (file contents), both used in accordance with GitHub's Terms of Service, which permit reading
+  public repositories programmatically.
+- **What is stored:** nothing. Repository content lives in memory for the duration of one analysis
+  request and is never written to a database, disk or log. The only cache is a short-lived
+  in-memory context cache, and the model provider does not train on API traffic.
+- **What is never used:** no client data, no company-confidential data, no personal information, no
+  social-media data. OnboardPilot does not scrape social media and does not process private
+  repositories.
+- **Attribution:** generated reports name their source repository and link every claim back to the
+  exact file, so the origin of every statement is traceable.
+- **No dataset is redistributed** with this repository.
+
 ## Compliance
 
 - Original work created during the IBM Bob 2.0 Hackathon build window.
