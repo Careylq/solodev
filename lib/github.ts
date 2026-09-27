@@ -239,6 +239,14 @@ async function fetchViaContentsApi(
   }
 }
 
+/**
+ * Once raw.githubusercontent.com fails at the transport level, stop trying it for a while.
+ * Without this, every one of the ~48 files pays the full timeout before falling back, which turned
+ * a 13-second analysis into a 78-second one on a network that blocks the raw host.
+ */
+let rawHostDownUntil = 0;
+const RAW_HOST_COOLDOWN_MS = 5 * 60 * 1000;
+
 async function fetchRawFile(
   owner: string,
   repo: string,
@@ -246,6 +254,8 @@ async function fetchRawFile(
   path: string,
   charCap: number = PER_FILE_CHARS,
 ): Promise<RepoFile | null> {
+  if (Date.now() < rawHostDownUntil) return null; // known unreachable; go straight to the fallback
+
   const encoded = path.split('/').map(encodeURIComponent).join('/');
   const url = `${RAW}/${owner}/${repo}/${encodeURIComponent(branch)}/${encoded}`;
 
@@ -265,6 +275,8 @@ async function fetchRawFile(
       clearTimeout(timer);
       if (!response.ok) {
         if (response.status === 404) return null;
+        // 429/5xx: throttled rather than blocked. Trip the breaker so the batch moves on.
+        rawHostDownUntil = Date.now() + RAW_HOST_COOLDOWN_MS;
         continue;
       }
       const text = await response.text();
@@ -276,7 +288,8 @@ async function fetchRawFile(
         : text;
       return { path, content, truncated, bytes: text.length };
     } catch {
-      // fall through to the retry
+      // Transport-level failure (timeout, DNS, connection reset): treat the host as down.
+      rawHostDownUntil = Date.now() + RAW_HOST_COOLDOWN_MS;
     }
   }
   return null;
