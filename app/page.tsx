@@ -27,8 +27,8 @@ const BOB_CAPABILITIES = [
     body: 'Bob made real, multi-file changes under an approved plan: tightening the repository ranking heuristics in lib/github.ts, hardening the server-sent-events error paths, and adding the guardrails that stop test fixtures crowding out core source.',
   },
   {
-    title: 'Parallel tasks & subagents',
-    body: 'Bob fanned the five analyst prompt contracts out to isolated subagent contexts and red-teamed them in parallel, hunting for the input that would make a model cite a file path that does not exist.',
+    title: 'Plan mode',
+    body: 'Bob read the repository, the challenge statement and the submission rules, then produced the hardening plan the rest of the build followed — every item with the files involved, the risk of skipping it and an effort estimate.',
   },
   {
     title: 'Document understanding',
@@ -40,7 +40,7 @@ const BOB_CAPABILITIES = [
   },
   {
     title: 'Custom rules & .bobignore',
-    body: 'Project rules pinned the "always cite a real file path" discipline and the code style; .bobignore kept credentials out of Bob session history from the first commit, and a security-auditor mode ran the credential and untrusted-input audit.',
+    body: 'Project rules pinned the "always cite a real file path" discipline and the code style; .bobignore kept credentials out of Bob session history from the first commit, and a dedicated security pass covered credential handling and untrusted input.',
   },
   {
     title: 'Task session summaries',
