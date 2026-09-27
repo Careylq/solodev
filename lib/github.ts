@@ -198,6 +198,47 @@ function scoreFile(path: string, docCount: number, entryCount: number): number {
   return score;
 }
 
+/**
+ * Fallback content reader for networks where raw.githubusercontent.com is blocked or throttled.
+ *
+ * The GitHub Contents API lives on api.github.com, which stays reachable on networks that block
+ * the raw host (observed on mainland China networks). It needs a token to be worth using — without
+ * one it shares the 60-per-hour budget with the tree call — so it only runs when GITHUB_TOKEN is set.
+ */
+async function fetchViaContentsApi(
+  owner: string,
+  repo: string,
+  ref: string,
+  path: string,
+  charCap: number,
+): Promise<RepoFile | null> {
+  if (!process.env.GITHUB_TOKEN) return null;
+  const encoded = path.split('/').map(encodeURIComponent).join('/');
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 9000);
+    const response = await fetch(
+      `${API}/repos/${owner}/${repo}/contents/${encoded}?ref=${encodeURIComponent(ref)}`,
+      {
+        // raw+json returns the file body directly instead of a base64 envelope.
+        headers: { ...(apiHeaders() as Record<string, string>), Accept: 'application/vnd.github.raw' },
+        signal: controller.signal,
+        cache: 'no-store',
+      },
+    );
+    clearTimeout(timer);
+    if (!response.ok) return null;
+    const text = await response.text();
+    const truncated = text.length > charCap;
+    const content = truncated
+      ? `${text.slice(0, Math.floor(charCap * 0.68))}\n\n… [${text.length - charCap} characters omitted] …\n\n${text.slice(-Math.floor(charCap * 0.32))}`
+      : text;
+    return { path, content, truncated, bytes: text.length };
+  } catch {
+    return null;
+  }
+}
+
 async function fetchRawFile(
   owner: string,
   repo: string,
@@ -213,7 +254,9 @@ async function fetchRawFile(
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 9000);
+      // Shorter than the API timeout on purpose: if this host is blocked, every file pays this
+      // cost, and a slow failure would stall the whole analysis instead of degrading it.
+      const timer = setTimeout(() => controller.abort(), 5000);
       const response = await fetch(url, {
         headers: { 'User-Agent': 'OnboardPilot' },
         signal: controller.signal,
@@ -340,7 +383,11 @@ export async function loadRepoContext(input: string): Promise<RepoContext> {
   for (let i = 0; i < selected.length; i += batchSize) {
     const batch = selected.slice(i, i + batchSize);
     const results = await Promise.all(
-      batch.map((path) => fetchRawFile(owner, repo, branch, path, perFileCap)),
+      batch.map(async (path) => {
+        const viaRaw = await fetchRawFile(owner, repo, branch, path, perFileCap);
+        // Fall through to api.github.com when the raw host is blocked or throttling.
+        return viaRaw ?? fetchViaContentsApi(owner, repo, branch, path, perFileCap);
+      }),
     );
     for (const file of results) {
       if (!file) continue;
@@ -348,12 +395,17 @@ export async function loadRepoContext(input: string): Promise<RepoContext> {
       keyFiles.push(file);
       totalContextChars += file.content.length;
     }
+    // A whole batch with nothing readable means the content host is unreachable rather than the
+    // files being missing, so fail fast instead of paying the timeout another five times.
+    if (keyFiles.length === 0 && i >= batchSize) break;
     if (totalContextChars > TOTAL_CONTEXT_CHARS * 0.94) break;
   }
 
   if (keyFiles.length === 0) {
     throw new RepoError(
-      'Could not read any text files from this repository. It may be empty, binary-only, or a private repository.',
+      process.env.GITHUB_TOKEN
+        ? 'Could not read any file contents from this repository. It may be empty, binary-only, or private.'
+        : 'Could not read any file contents. The repository may be empty or private — or this network is blocking raw.githubusercontent.com. Setting GITHUB_TOKEN enables a fallback that reads file contents through api.github.com instead.',
     );
   }
 

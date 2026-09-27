@@ -14,8 +14,6 @@
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const STARTED_AT = Date.now();
-
 async function probeModelProvider(): Promise<{ live: boolean; detail: string }> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) return { live: false, detail: 'not configured' };
@@ -66,8 +64,6 @@ export async function GET(request: Request) {
       // Without a token GitHub allows only 60 unauthenticated calls per hour, shared per egress IP.
       githubRateLimit: githubTokenConfigured ? '5000/hour (token)' : '60/hour (unauthenticated)',
       modelProviderProbe: probe ? probe.detail : 'not run (add ?selftest=1)',
-      uptimeSeconds: Math.round((Date.now() - STARTED_AT) / 1000),
-      nodeVersion: process.version,
       time: new Date().toISOString(),
       hint: ready
         ? 'Ready. POST /api/analyze with {"repo":"owner/name"}.'

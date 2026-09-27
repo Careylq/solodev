@@ -73,6 +73,13 @@ function extractBalancedObject(text: string): string | null {
 /**
  * Salvages a JSON object that was cut off mid-stream: keeps the last complete value and closes
  * whatever containers are still open. A truncated answer should degrade, not disappear.
+ *
+ * Known limitation (deliberately deferred): after truncation the running `stack` may be stale —
+ * if the last committed position `lastComplete` falls inside a container that was already closed
+ * earlier in the source, the closing brackets appended here can produce structurally invalid JSON
+ * that happens to parse (e.g. a spurious extra `}` at the top level). This stale-container-stack
+ * risk is accepted for now because the function is used only as a last-resort fallback and any
+ * surviving partial result is better than propagating an error to the user.
  */
 function repairTruncatedObject(text: string): string | null {
   const start = text.indexOf('{');
@@ -185,7 +192,9 @@ IMPORTANT: your previous response was cut off before the JSON object was complet
           ],
           response_format: { type: 'json_object' },
           temperature,
-          max_tokens: maxTokens,
+          // On retry, reduce the budget to 60 % so the model is incentivised to answer more
+          // compactly and avoid hitting the ceiling a second time for the same reason.
+          max_tokens: attempt === 0 ? maxTokens : Math.round(maxTokens * 0.6),
           stream: false,
         }),
         signal: controller.signal,
@@ -201,17 +210,21 @@ IMPORTANT: your previous response was cut off before the JSON object was complet
         usage?: { prompt_tokens?: number; completion_tokens?: number };
       };
 
-      if (usage && payload.usage) {
-        usage.prompt += payload.usage.prompt_tokens ?? 0;
-        usage.completion += payload.usage.completion_tokens ?? 0;
-      }
-
       const choice = payload.choices?.[0];
       const content = choice?.message?.content ?? '';
       if (!content) throw new DeepSeekError('Empty completion from DeepSeek');
 
       if (choice?.finish_reason === 'length') {
         throw new DeepSeekError('Completion hit the token ceiling and the JSON was truncated');
+      }
+
+      // Accumulate after the truncation check: a cut-off attempt is not billed to the caller,
+      // which previously made a retried call report the sum of both attempts as one call's worth.
+      // A parse failure later in this function does still record its tokens, because those tokens
+      // were genuinely consumed — the caller wants this agent's total, not one request's.
+      if (usage && payload.usage) {
+        usage.prompt += payload.usage.prompt_tokens ?? 0;
+        usage.completion += payload.usage.completion_tokens ?? 0;
       }
 
       return parseJsonLoose<T>(content, choice?.finish_reason);

@@ -4,6 +4,16 @@ function line(value: string | undefined | null): string {
   return (value ?? '').replace(/\s+/g, ' ').trim();
 }
 
+/** Escape a value for direct placement inside a GFM table cell (between the `|` characters). */
+function escCell(value: string | undefined | null): string {
+  return line(value).replace(/\|/g, '\\|');
+}
+
+/** Escape a value for placement inside a backtick inline code span. */
+function escCode(value: string | undefined | null): string {
+  return line(value).replace(/`/g, '\\`');
+}
+
 function bullets(items: string[], prefix = '- '): string {
   return items.map((item) => `${prefix}${line(item)}`).join('\n');
 }
@@ -51,9 +61,9 @@ export function buildOnboardingMarkdown(
       out.push(`_${line(layer.purpose)}_`);
       out.push('');
       for (const mod of layer.modules ?? []) {
-        out.push(`- **${line(mod.name)}** (\`${line(mod.path)}\`) — ${line(mod.responsibility)}`);
+        out.push(`- **${line(mod.name)}** (\`${escCode(mod.path)}\`) — ${line(mod.responsibility)}`);
         if (mod.keyFiles?.length) {
-          out.push(`  - key files: ${mod.keyFiles.map((f) => `\`${line(f)}\``).join(', ')}`);
+          out.push(`  - key files: ${mod.keyFiles.map((f) => `\`${escCode(f)}\``).join(', ')}`);
         }
       }
       out.push('');
@@ -67,7 +77,7 @@ export function buildOnboardingMarkdown(
         out.push('');
         (flow.steps ?? []).forEach((step, index) => {
           const evidence = step.evidence?.length
-            ? ` _(${step.evidence.map((f) => `\`${line(f)}\``).join(', ')})_`
+            ? ` _(${step.evidence.map((f) => `\`${escCode(f)}\``).join(', ')})_`
             : '';
           out.push(`${index + 1}. **${line(step.label)}** — ${line(step.detail)}${evidence}`);
         });
@@ -91,7 +101,7 @@ export function buildOnboardingMarkdown(
     out.push('');
     for (const entry of entries.entryPoints ?? []) {
       out.push(
-        `- **${line(entry.name)}** (\`${line(entry.path)}\`) · ${line(entry.kind)} · trigger: ${line(
+        `- **${line(entry.name)}** (\`${escCode(entry.path)}\`) · ${line(entry.kind)} · trigger: ${line(
           entry.trigger,
         )} — ${line(entry.description)}`,
       );
@@ -101,7 +111,7 @@ export function buildOnboardingMarkdown(
       out.push(`### End-to-end trace: ${line(entries.trace.name)}`);
       out.push('');
       for (const step of entries.trace.steps ?? []) {
-        const files = step.files?.length ? ` [${step.files.map((f) => `\`${line(f)}\``).join(', ')}]` : '';
+        const files = step.files?.length ? ` [${step.files.map((f) => `\`${escCode(f)}\``).join(', ')}]` : '';
         out.push(`${step.order}. **${line(step.action)}**${files} — ${line(step.note)}`);
       }
       out.push('');
@@ -118,8 +128,8 @@ export function buildOnboardingMarkdown(
     out.push('| --- | --- | --- |');
     for (const item of conv.conventions ?? []) {
       out.push(
-        `| ${line(item.area)} | ${line(item.convention)} | ${(item.evidence ?? [])
-          .map((f) => `\`${line(f)}\``)
+        `| ${escCell(item.area)} | ${escCell(item.convention)} | ${(item.evidence ?? [])
+          .map((f) => `\`${escCode(f)}\``)
           .join('<br>')} |`,
       );
     }
@@ -135,7 +145,7 @@ export function buildOnboardingMarkdown(
         out.push(
           `- **[${line(risk.severity).toUpperCase()}] ${line(risk.title)}** — ${line(
             risk.detail,
-          )} _(${(risk.evidence ?? []).map((f) => `\`${line(f)}\``).join(', ')})_`,
+          )} _(${(risk.evidence ?? []).map((f) => `\`${escCode(f)}\``).join(', ')})_`,
         );
       }
       out.push('');
@@ -154,7 +164,7 @@ export function buildOnboardingMarkdown(
       out.push(`_${line(task.why)}_`);
       out.push('');
       if (task.files?.length) {
-        out.push(`**Files:** ${task.files.map((f) => `\`${line(f)}\``).join(', ')}`);
+        out.push(`**Files:** ${task.files.map((f) => `\`${escCode(f)}\``).join(', ')}`);
         out.push('');
       }
       out.push('**Steps**');
@@ -186,7 +196,7 @@ export function buildOnboardingMarkdown(
       out.push(`**Checkpoint:** ${line(step.checkpoint)}`);
       if (step.files?.length) {
         out.push('');
-        out.push(`**Files:** ${step.files.map((f) => `\`${line(f)}\``).join(', ')}`);
+        out.push(`**Files:** ${step.files.map((f) => `\`${escCode(f)}\``).join(', ')}`);
       }
       out.push('');
     }
@@ -202,7 +212,7 @@ export function buildOnboardingMarkdown(
       out.push('| Term | Meaning |');
       out.push('| --- | --- |');
       for (const term of plan.glossary) {
-        out.push(`| ${line(term.term)} | ${line(term.meaning)} |`);
+        out.push(`| ${escCell(term.term)} | ${escCell(term.meaning)} |`);
       }
       out.push('');
     }
@@ -230,7 +240,7 @@ export function buildOnboardingMarkdown(
     out.push('| File | Used in |');
     out.push('| --- | --- |');
     for (const [path, where] of [...cited.entries()].sort()) {
-      out.push(`| \`${path}\` | ${[...where].join(', ')} |`);
+      out.push(`| \`${escCode(path)}\` | ${escCell([...where].join(', '))} |`);
     }
     out.push('');
   }

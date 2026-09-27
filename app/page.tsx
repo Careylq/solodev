@@ -156,6 +156,20 @@ export default function Home() {
           }
         }
 
+        // If the stream closed without a final `done` event (server crash, timeout), any agent
+        // still in `running` or `queued` would be stuck forever with no retry button. Move them
+        // to `error` so the existing per-agent retry UI becomes available.
+        setStatuses((prev) => {
+          const next = { ...prev };
+          for (const id of Object.keys(next) as (keyof typeof next)[]) {
+            const s = next[id];
+            if (s?.state === 'running' || s?.state === 'queued') {
+              next[id] = { state: 'error', error: 'Stream ended without a result' };
+            }
+          }
+          return next;
+        });
+
         if (!only) {
           window.setTimeout(
             () => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
