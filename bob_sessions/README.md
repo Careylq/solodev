@@ -43,9 +43,13 @@ solodev_task03_agent_mode_hardening_summary.png
 | 09 | `solodev_task09_readme_audit_summary.png` | README claim audit against the source |
 | 10 | `solodev_task10_deploy_runbook_summary.png` | Deployment runbook for Vercel |
 
-Each row corresponds to one Bob IDE task. The screenshot proves the task ran on the
-hackathon-provisioned Bob account (`ibm-coding-challenge-uat`, region `us-east`) and shows its
-task session consumption summary.
+Each row corresponds to one IBM Bob IDE task. The screenshot proves the task was performed in IBM
+Bob IDE and shows its task session consumption summary, including the Bobcoins consumed.
+
+**Account note:** the hackathon-provisioned account invitation never reached our registered mailbox,
+so the work was carried out on an IBM Bob free-trial account (30 days, 40+ Bobcoins, as documented at
+bob.ibm.com/pricing). The tool, workflow, features used and evidence produced are identical — only the
+account the Bobcoins came from differs.
 
 No credentials, API keys or session payloads are stored in this folder — screenshots of the
 consumption summary only.
