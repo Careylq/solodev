@@ -1,41 +1,129 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ============================================
+# SECURITY .GITIGNORE — IBM Bob 2.0 Hackathon
+# Based on the official watsonxhackathon/ibm-hackathon-template
+# DO NOT REMOVE OR MODIFY SECURITY PATTERNS
+# ============================================
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# ============================================
+# AI ASSISTANT SESSION FILES (CRITICAL)
+# ============================================
+# NOTE: the bob_sessions/ folder is REQUIRED for project submission.
+# Live session files are excluded, but the exported summary screenshots must be committed.
+.copilot/
+.cursor/
+.codeium/
+.bob/
 
-# testing
-/coverage
+# ============================================
+# CREDENTIALS AND SECRETS (CRITICAL)
+# ============================================
 
-# next.js
+# Environment files
+.env
+.env.*
+!.env.example
+*.env
+env.local
+.env.local
+.env.*.local
+
+# IBM Cloud credentials
+ibmcloud-credentials.json
+ibm-credentials.env
+*-credentials.json
+*apikey*
+*api-key*
+*api_key*
+
+# Configuration files with credentials
+config.json
+config.yaml
+config.yml
+secrets.json
+secrets.yaml
+secrets.yml
+credentials.json
+credentials.yaml
+
+# Private keys
+*.pem
+*.key
+*.p12
+*.pfx
+*.cer
+*.crt
+id_rsa
+id_dsa
+*.ppk
+
+# Generic credential patterns
+*credentials*
+*secret*
+*password*
+*token*
+
+# Database credentials
+database.yml
+database.json
+db-config.*
+
+# ============================================
+# DEVELOPMENT FILES
+# ============================================
+
+# Node.js / Next.js
+node_modules/
 /.next/
 /out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+.npm
 
-# env files (can opt-in for committing if needed)
-.env*
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
 
-# vercel
+# Java
+*.class
+*.jar
+*.war
+target/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build outputs
+dist/
+build/
+*.log
+*.tsbuildinfo
+
+# Backup files
+*.bak
+*.tmp
+*.temp
+.backup/
+
+# ============================================
+# DO NOT REMOVE ABOVE PATTERNS
+# Add project-specific patterns below
+# ============================================
+
 .vercel
 
-# typescript
-*.tsbuildinfo
+# next.js generated types (regenerated on dev/build)
 next-env.d.ts
