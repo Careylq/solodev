@@ -176,7 +176,7 @@ function depthOf(path: string): number {
 }
 
 /** Ranks files so the most onboarding-relevant ones are read first. */
-function scoreFile(path: string, docCount: number, entryCount: number): number {
+export function scoreFile(path: string, docCount: number, entryCount: number): number {
   const lower = path.toLowerCase();
   const base = lower.split('/').pop() ?? lower;
   const depth = depthOf(path);
