@@ -20,7 +20,7 @@ const LANGUAGE_BY_EXT: Record<string, string> = {
  * costs one of the 60 unauthenticated API calls per hour, and the tree already tells us what we
  * need. Values are file counts, not bytes, and the prompt says so.
  */
-function languagesFromTree(paths: string[]): Record<string, number> {
+export function languagesFromTree(paths: string[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const path of paths) {
     const base = path.split('/').pop() ?? '';
