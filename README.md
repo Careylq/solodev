@@ -135,15 +135,13 @@ summaries for each workstream are committed under [`bob_sessions/`](bob_sessions
 
 | Workstream | How Bob was used |
 | --- | --- |
-| Orientation and plan | Plan mode over `AGENTS.md`, the README and `lib/` to produce the hardening plan the rest of the work followed |
-| Code review | The built-in Review workflow signed off `lib/github.ts` and `lib/agents.ts`: crafted URL parsing, unbounded reads, missing timeouts, prompt injection from repository content |
-| Agent-mode hardening | Multi-file changes under an approved plan — ranking heuristics, a hard cap on how many test files enter the context, explicit guardrails against invented file paths |
-| Streaming API | Error-path hardening in `app/api/analyze/route.ts`: client disconnect, close-exactly-once, per-agent isolation so one failure cannot abort the other four |
-| Verification | Bob generated and ran unit tests for the pure helpers (`parseRepoInput`, the markdown export, the ranking guarantee) with Node's built-in test runner |
-| Security audit | A security-auditor mode checked credential leakage, untrusted repository content and SSRF through user-supplied repository identifiers |
-| Prompt red-teaming | Parallel subagents adversarially tested all five analyst prompt contracts for hallucinated file paths |
-| Documentation | Bob generated the architecture diagrams used in the pitch deck from the actual source, and audited every claim in this README against the code |
-| Compliance | Document understanding over the hackathon guide and submission rules to derive the deliverable checklist |
+| 01 · Orientation and plan | Plan mode across `AGENTS.md`, `README.md` and `lib/`, producing the hardening plan in [hardening-plan.md](hardening-plan.md) |
+| 02 · Code review | The Review workflow signed off `lib/github.ts` and `lib/agents.ts`, confirming three real defects: a broken `cd` step in this README, no anti-prompt-injection rule in the shared agent rules, and a `ReadableStream` with no `cancel()` handler |
+| 03 · Agent-mode hardening | Multi-file changes under an approved plan, implementing the review findings in the context, agent and route layers |
+| 04 · Verification | Unit tests for the pure helpers (`parseRepoInput`, `languagesFromTree`, the markdown export) using Node's built-in test runner, then executed |
+| 05 · Streaming API | Close-exactly-once and client-disconnect handling in `app/api/analyze/route.ts`, with per-agent isolation so one failure cannot abort the other four |
+| 06 · Security audit | Credential handling, untrusted repository text as data rather than instructions, and SSRF through user-supplied repository identifiers |
+| 07 · Documentation | Architecture diagrams generated from the actual source for the pitch deck |
 
 ## Impact
 
