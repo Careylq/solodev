@@ -224,6 +224,7 @@ export async function runAgent<T>(
   context: RepoContext,
   systemPrompt: string,
   usage: Usage,
+  signal?: AbortSignal,
 ): Promise<T> {
   return jsonCompletion<T>({
     system: systemPrompt,
@@ -231,5 +232,6 @@ export async function runAgent<T>(
     maxTokens: agent.maxTokens,
     temperature: 0.2,
     usage,
+    signal,
   });
 }

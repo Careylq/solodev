@@ -86,6 +86,8 @@ export async function POST(request: Request) {
   const encoder = new TextEncoder();
   const startedAt = Date.now();
 
+  const abortController = new AbortController();
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let closed = false;
@@ -120,7 +122,7 @@ export async function POST(request: Request) {
             const agentStart = Date.now();
             const usage: Usage = { prompt: 0, completion: 0 };
             try {
-              const data = await runAgent<unknown>(agent, context, systemPrompt, usage);
+              const data = await runAgent<unknown>(agent, context, systemPrompt, usage, abortController.signal);
               tokens.prompt += usage.prompt;
               tokens.completion += usage.completion;
               send({
@@ -132,6 +134,8 @@ export async function POST(request: Request) {
                 data,
               });
             } catch (error) {
+              // Silently drop aborted agents — the client is gone, nothing to report.
+              if (abortController.signal.aborted) return;
               send({
                 type: 'agent',
                 id: agent.id,
@@ -145,24 +149,34 @@ export async function POST(request: Request) {
 
         send({ type: 'done', totalMs: Date.now() - startedAt, tokens });
       } catch (error) {
-        const message =
-          error instanceof RepoError
-            ? error.message
-            : error instanceof Error
+        if (!abortController.signal.aborted) {
+          const message =
+            error instanceof RepoError
               ? error.message
-              : 'Unexpected error while analysing the repository';
-        send({ type: 'error', error: message });
+              : error instanceof Error
+                ? error.message
+                : 'Unexpected error while analysing the repository';
+          send({ type: 'error', error: message });
+        }
       } finally {
         closed = true;
         try {
           controller.close();
         } catch {
-          // already closed
+          // already closed — cancel() may have closed it first
         }
       }
     },
+    cancel() {
+      // Browser closed the SSE connection before all agents finished.
+      // Abort in-flight DeepSeek requests so they stop consuming API quota.
+      abortController.abort();
+    },
   });
 
+  // X-Accel-Buffering: no tells nginx (and nginx-compatible proxies such as Vercel's
+  // edge layer) to disable proxy buffering for this response, so SSE frames reach
+  // the browser as soon as they are written rather than being held until the buffer fills.
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream; charset=utf-8',

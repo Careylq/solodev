@@ -12,6 +12,7 @@ type JsonCompletionOptions = {
   model?: string;
   timeoutMs?: number;
   usage?: Usage;
+  signal?: AbortSignal;
 };
 
 function parseJsonLoose<T>(raw: string, finishReason?: string): T {
@@ -161,6 +162,7 @@ export async function jsonCompletion<T>(options: JsonCompletionOptions): Promise
     model = 'deepseek-chat',
     timeoutMs = 105_000,
     usage,
+    signal: callerSignal,
   } = options;
 
   let lastError: unknown = null;
@@ -175,8 +177,14 @@ export async function jsonCompletion<T>(options: JsonCompletionOptions): Promise
 
 IMPORTANT: your previous response was cut off before the JSON object was complete, so it could not be parsed. Answer the same task again, but far more compactly: use the minimum number of items the schema allows, and keep every string shorter than 100 characters. The JSON object must be complete and syntactically valid.`;
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timeoutController = new AbortController();
+    const timer = setTimeout(() => timeoutController.abort(), timeoutMs);
+    // Compose the caller's cancellation signal with the local timeout so either
+    // the route's AbortController (browser disconnect) or the per-request timeout
+    // can terminate this fetch, whichever fires first.
+    const fetchSignal = callerSignal
+      ? AbortSignal.any([callerSignal, timeoutController.signal])
+      : timeoutController.signal;
     try {
       const response = await fetch(ENDPOINT, {
         method: 'POST',
@@ -197,7 +205,7 @@ IMPORTANT: your previous response was cut off before the JSON object was complet
           max_tokens: attempt === 0 ? maxTokens : Math.round(maxTokens * 0.6),
           stream: false,
         }),
-        signal: controller.signal,
+        signal: fetchSignal,
       });
 
       if (!response.ok) {
@@ -229,6 +237,9 @@ IMPORTANT: your previous response was cut off before the JSON object was complet
 
       return parseJsonLoose<T>(content, choice?.finish_reason);
     } catch (error) {
+      // If the caller's signal was aborted, stop retrying immediately and
+      // let the abort propagate — there is no point in a second attempt.
+      if (callerSignal?.aborted) throw error;
       lastError = error;
     } finally {
       clearTimeout(timer);
