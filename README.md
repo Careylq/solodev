@@ -111,7 +111,7 @@ appears the moment its agent finishes rather than waiting for the slowest one.
 ## Run it locally
 
 ```bash
-git clone https://github.com/Careylq/onboardpilot.git
+git clone https://github.com/Careylq/solodev.git
 cd onboardpilot
 npm install
 cp .env.example .env.local     # then add your DEEPSEEK_API_KEY
