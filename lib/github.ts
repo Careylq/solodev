@@ -3,6 +3,34 @@ import type { ContextStats, RepoContext, RepoFile, RepoMeta } from './types';
 const API = 'https://api.github.com';
 const RAW = 'https://raw.githubusercontent.com';
 
+const LANGUAGE_BY_EXT: Record<string, string> = {
+  ts: 'TypeScript', tsx: 'TypeScript', js: 'JavaScript', jsx: 'JavaScript', mjs: 'JavaScript',
+  cjs: 'JavaScript', py: 'Python', go: 'Go', rb: 'Ruby', java: 'Java', cs: 'C#', rs: 'Rust',
+  kt: 'Kotlin', kts: 'Kotlin', swift: 'Swift', php: 'PHP', c: 'C', h: 'C', cpp: 'C++',
+  cc: 'C++', hpp: 'C++', scala: 'Scala', sh: 'Shell', bash: 'Shell', sql: 'SQL', html: 'HTML',
+  css: 'CSS', scss: 'CSS', sass: 'CSS', less: 'CSS', vue: 'Vue', svelte: 'Svelte', dart: 'Dart',
+  ex: 'Elixir', exs: 'Elixir', hs: 'Haskell', lua: 'Lua', r: 'R', jl: 'Julia', pl: 'Perl',
+  m: 'Objective-C', mm: 'Objective-C', gradle: 'Gradle', tf: 'HCL', hcl: 'HCL', proto: 'Protobuf',
+  graphql: 'GraphQL', gql: 'GraphQL', md: 'Markdown', mdx: 'Markdown', json: 'JSON',
+  yml: 'YAML', yaml: 'YAML', toml: 'TOML', xml: 'XML', astro: 'Astro',
+};
+
+/**
+ * Language mix derived from the file tree instead of the GitHub /languages endpoint. That endpoint
+ * costs one of the 60 unauthenticated API calls per hour, and the tree already tells us what we
+ * need. Values are file counts, not bytes, and the prompt says so.
+ */
+function languagesFromTree(paths: string[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const path of paths) {
+    const base = path.split('/').pop() ?? '';
+    const ext = base.includes('.') ? base.split('.').pop()!.toLowerCase() : '';
+    const language = LANGUAGE_BY_EXT[ext];
+    if (language) counts[language] = (counts[language] ?? 0) + 1;
+  }
+  return counts;
+}
+
 const EXCLUDED_DIRS = new Set([
   'node_modules', '.git', '.next', 'dist', 'build', 'out', 'coverage', 'vendor',
   'target', '__pycache__', '.venv', 'venv', '.idea', '.vscode', 'obj', '.gradle',
@@ -168,27 +196,36 @@ async function fetchRawFile(
 ): Promise<RepoFile | null> {
   const encoded = path.split('/').map(encodeURIComponent).join('/');
   const url = `${RAW}/${owner}/${repo}/${encodeURIComponent(branch)}/${encoded}`;
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 9000);
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'OnboardPilot' },
-      signal: controller.signal,
-      cache: 'no-store',
-    });
-    clearTimeout(timer);
-    if (!response.ok) return null;
-    const text = await response.text();
-    const truncated = text.length > charCap;
-    // For oversized files keep the head and the tail: the top of a module usually declares its
-    // dependencies and public surface, while the bottom holds the exports and wiring.
-    const content = truncated
-      ? `${text.slice(0, Math.floor(charCap * 0.68))}\n\n… [${text.length - charCap} characters omitted] …\n\n${text.slice(-Math.floor(charCap * 0.32))}`
-      : text;
-    return { path, content, truncated, bytes: text.length };
-  } catch {
-    return null;
+
+  // One retry: raw.githubusercontent occasionally throttles under bursts, and a missing file only
+  // degrades the report — but a burst of them degrades it badly.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 9000);
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'OnboardPilot' },
+        signal: controller.signal,
+        cache: 'no-store',
+      });
+      clearTimeout(timer);
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        continue;
+      }
+      const text = await response.text();
+      const truncated = text.length > charCap;
+      // For oversized files keep the head and the tail: the top of a module usually declares its
+      // dependencies and public surface, while the bottom holds the exports and wiring.
+      const content = truncated
+        ? `${text.slice(0, Math.floor(charCap * 0.68))}\n\n… [${text.length - charCap} characters omitted] …\n\n${text.slice(-Math.floor(charCap * 0.32))}`
+        : text;
+      return { path, content, truncated, bytes: text.length };
+    } catch {
+      // fall through to the retry
+    }
   }
+  return null;
 }
 
 function summariseTree(tree: string[]) {
@@ -225,12 +262,11 @@ export async function loadRepoContext(input: string): Promise<RepoContext> {
 
   const branch = requestedBranch || meta.default_branch;
 
-  const [treePayload, languages] = await Promise.all([
-    ghJson<{ tree: { path: string; type: string }[]; truncated: boolean }>(
-      `/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
-    ),
-    ghJson<Record<string, number>>(`/repos/${owner}/${repo}/languages`).catch(() => ({})),
-  ]);
+  // Two API calls per analysis: repository metadata and the recursive tree. The language mix is
+  // derived locally so we do not spend a third call against the shared rate limit.
+  const treePayload = await ghJson<{ tree: { path: string; type: string }[]; truncated: boolean }>(
+    `/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+  );
 
   const rawPaths = treePayload.tree
     .filter((node) => node.type === 'blob')
@@ -248,7 +284,7 @@ export async function loadRepoContext(input: string): Promise<RepoContext> {
     .sort((a, b) => b.score - a.score)
     .map((item) => item.path);
 
-  const docsFound = usable.filter((p) => /(^|\/)(readme|contributing|architecture|changelog)|^docs?\//i.test(p)).slice(0, 12);
+  const docsFound = usable.filter((p) => /(^|\/)(readme|contributing|architecture|changelog)|^docs?\//i.test(p));
   const testFiles = usable.filter((p) => /(^|\/)(tests?|__tests__|spec)\/|\.(test|spec)\./i.test(p));
   const manifestsFound = usable.filter((p) => MANIFESTS.has(p.split('/').pop()!.toLowerCase()) || /dockerfile|docker-compose\.ya?ml|makefile$/i.test(p));
   const entryCandidates = usable.filter((p) => ENTRY_RE.test(p));
@@ -319,7 +355,7 @@ export async function loadRepoContext(input: string): Promise<RepoContext> {
     description: meta.description,
     defaultBranch: meta.default_branch ?? branch,
     primaryLanguage: meta.language,
-    languages: languages ?? {},
+    languages: languagesFromTree(usable),
     stars: meta.stargazers_count ?? 0,
     forks: meta.forks_count ?? 0,
     openIssues: meta.open_issues_count ?? 0,
@@ -349,9 +385,18 @@ export async function loadRepoContext(input: string): Promise<RepoContext> {
 
 export function contextStats(context: RepoContext): ContextStats {
   const modules = context.topLevelDirs.filter((dir) => dir.name !== '(root files)').length;
-  const estimatedManualHours = Math.max(
-    4,
-    Math.round(context.totalFilesInRepo / 90 + modules * 3.5 + context.testFiles.length * 0.15),
+  // A deliberately conservative heuristic for the manual ramp-up cost. It is logarithmic in file
+  // count rather than linear — a 33,000-file monorepo does not cost 300x a 100-file library — and
+  // it is capped so the number stays defensible instead of turning into a meaningless headline.
+  const fileComponent = Math.min(60, Math.log2(context.totalFilesInRepo + 1) * 4);
+  const moduleComponent = modules * 3.5;
+  const testComponent = Math.min(12, context.testFiles.length * 0.1);
+  const undocumentedPenalty = context.docsFound.length === 0 ? 8 : 0;
+  const estimatedManualHours = Math.round(
+    Math.min(
+      160,
+      Math.max(4, fileComponent + moduleComponent + testComponent + undocumentedPenalty),
+    ),
   );
   return {
     filesInRepo: context.totalFilesInRepo,

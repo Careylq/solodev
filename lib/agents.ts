@@ -39,7 +39,7 @@ export function buildSystemPrompt(context: RepoContext): string {
   const languages = Object.entries(meta.languages)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6)
-    .map(([name, bytes]) => `${name} (${Math.round(bytes / 1024)} KB)`)
+    .map(([name, files]) => `${name} (${files} files)`)
     .join(', ');
 
   return `${SHARED_RULES}
@@ -50,7 +50,7 @@ REPOSITORY CONTEXT
 Repository: ${meta.fullName}
 Description: ${meta.description ?? '(none provided)'}
 Primary language: ${meta.primaryLanguage ?? 'unknown'}
-Languages by size: ${languages || 'unknown'}
+Languages by file count: ${languages || 'unknown'}
 Stars: ${meta.stars} | Forks: ${meta.forks} | Open issues: ${meta.openIssues}
 License: ${meta.license ?? 'none declared'}
 Default branch: ${meta.defaultBranch}

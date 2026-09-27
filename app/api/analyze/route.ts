@@ -64,8 +64,13 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const repo = (body.repo ?? '').trim();
-  if (!repo) return Response.json({ error: 'Missing "repo"' }, { status: 400 });
+  const repo = typeof body.repo === 'string' ? body.repo.trim() : '';
+  if (!repo) {
+    return Response.json(
+      { error: 'Missing or invalid "repo" field: expected a GitHub URL string.' },
+      { status: 400 },
+    );
+  }
   if (repo.length > 300) return Response.json({ error: 'Repository identifier is too long' }, { status: 400 });
 
   if (isRateLimited(clientKey(request))) {
