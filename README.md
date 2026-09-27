@@ -13,7 +13,7 @@ risk radar, three shippable first tasks and a seven-step ramp-up plan.
 Built for the **IBM Bob 2.0 Hackathon** — *Create a solution that improves a specific developer
 workflow.*
 
-📊 [Pitch deck](docs/pitch-deck.pdf) · 🖼 [Cover image](docs/cover.png) · 🤖 [Bob session evidence](bob_sessions/)
+📊 [Pitch deck](docs/pitch-deck.pdf) · 🖼 [Cover image](docs/cover.png) · 🧭 [Architecture diagrams](docs/diagrams.md) · 📄 [Example output](docs/example-onboarding-report.md) · 🤖 [Bob session evidence](bob_sessions/)
 
 ---
 
