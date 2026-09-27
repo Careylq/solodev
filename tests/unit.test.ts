@@ -79,6 +79,15 @@ describe('parseRepoInput', () => {
     assert.throws(() => parseRepoInput('just-a-name'), RepoError);
   });
 
+  it('rejects path-traversal style owner/repo segments', () => {
+    // '..' satisfies the character allow-list, so it needs its own guard: without it
+    // https://github.com/../etc/passwd was accepted as owner '..', repo 'etc'.
+    assert.throws(() => parseRepoInput('https://github.com/../etc/passwd'), RepoError);
+    assert.throws(() => parseRepoInput('https://github.com/../../x'), RepoError);
+    assert.throws(() => parseRepoInput('https://github.com/.../x'), RepoError);
+    assert.throws(() => parseRepoInput('https://github.com/%2e%2e/x'), RepoError);
+  });
+
   it('throws RepoError for three-segment short form', () => {
     // owner/repo/extra does not match the short regex
     assert.throws(() => parseRepoInput('owner/repo/extra'), RepoError);

@@ -87,3 +87,9 @@ id_dsa
 # ============================================
 # DO NOT REMOVE ABOVE PATTERNS
 # ============================================
+
+# Project-specific token patterns (covers GITHUB_TOKEN and other *_TOKEN vars)
+*TOKEN*
+*token*
+*GITHUB_TOKEN*
+*github_token*

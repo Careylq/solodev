@@ -209,8 +209,10 @@ IMPORTANT: your previous response was cut off before the JSON object was complet
       });
 
       if (!response.ok) {
-        const body = await response.text();
-        throw new DeepSeekError(`DeepSeek HTTP ${response.status}: ${body.slice(0, 300)}`);
+        // Do not include the response body: some providers echo request headers
+        // in error responses, which could surface the API key in an error message
+        // that is forwarded to the client.
+        throw new DeepSeekError(`DeepSeek HTTP ${response.status}`);
       }
 
       const payload = (await response.json()) as {

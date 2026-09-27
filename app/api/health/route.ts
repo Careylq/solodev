@@ -37,8 +37,10 @@ async function probeModelProvider(): Promise<{ live: boolean; detail: string }> 
     if (response.status === 402) return { live: false, detail: 'HTTP 402 — insufficient balance' };
     if (response.status === 429) return { live: true, detail: 'HTTP 429 — rate limited but the key is valid' };
     return { live: false, detail: `HTTP ${response.status}` };
-  } catch (error) {
-    return { live: false, detail: error instanceof Error ? error.message : 'request failed' };
+  } catch {
+    // Do not echo error.message: network error strings from the Node.js socket
+    // layer can include hostname fragments and are not safe to surface publicly.
+    return { live: false, detail: 'request failed' };
   } finally {
     clearTimeout(timer);
   }

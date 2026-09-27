@@ -89,6 +89,13 @@ export class RepoError extends Error {}
 
 export type ParsedRepo = { owner: string; repo: string; branch?: string; subPath?: string };
 
+/**
+ * Allow-list for GitHub owner and repository name characters. The negative lookahead rejects a
+ * value made only of dots, because `..` satisfies the character class and would otherwise let
+ * `https://github.com/../etc/passwd` through as owner `..`, repo `etc`.
+ */
+const OWNER_REPO_RE = /^(?!\.+$)[A-Za-z0-9_.-]+$/;
+
 export function parseRepoInput(input: string): ParsedRepo {
   const value = (input || '').trim();
   if (!value) throw new RepoError('Please paste a GitHub repository URL or "owner/repo".');
@@ -107,6 +114,16 @@ export function parseRepoInput(input: string): ParsedRepo {
     repo = urlMatch[2];
     branch = urlMatch[3];
     subPath = urlMatch[4];
+    // Validate owner and repo with the same allow-list used by the short form.
+    // The URL regex is intentionally loose to handle copy-pasted URLs, but the
+    // extracted owner/repo must still be valid GitHub identifiers before we use
+    // them to construct API paths.
+    const repoNoGit = repo.replace(/\.git$/i, '');
+    if (!OWNER_REPO_RE.test(owner) || !OWNER_REPO_RE.test(repoNoGit)) {
+      throw new RepoError(
+        'That does not look like a GitHub repository. Try https://github.com/owner/repo or owner/repo.',
+      );
+    }
   } else {
     const short = value.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
     if (!short) {
